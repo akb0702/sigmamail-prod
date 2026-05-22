@@ -1,3 +1,5 @@
+import { getAuthHeaders, signOut } from './auth'
+
 export interface TemplateConfig {
   templateName: string
   mainColor: string
@@ -29,33 +31,52 @@ export interface AuditUser {
   lastError: string | null
 }
 
-async function json<T>(res: Response): Promise<T> {
+export interface MeResponse {
+  admin: { email: string, name?: string, picture?: string } | null
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(path, {
+    ...init,
+    headers: {
+      ...(init.body ? { 'content-type': 'application/json' } : {}),
+      ...getAuthHeaders(),
+      ...init.headers,
+    },
+  })
+  if (res.status === 401) {
+    signOut()
+    throw new Error('Sign-in required')
+  }
+  if (res.status === 403) {
+    throw new Error('You are not authorized as an admin')
+  }
   if (!res.ok)
     throw new Error(`${res.status} ${res.statusText}`)
   return res.json() as Promise<T>
 }
 
 export const api = {
-  getCurrentTemplate: () =>
-    fetch('/api/templates/current').then(json<{ current: TemplateDoc | null }>),
+  me: () => request<MeResponse>('/api/me'),
 
-  publishTemplate: (body: TemplateConfig & { publishedBy: string }) =>
-    fetch('/api/templates', {
+  getCurrentTemplate: () => request<{ current: TemplateDoc | null }>('/api/templates/current'),
+
+  publishTemplate: (body: TemplateConfig) =>
+    request<{ published: TemplateDoc }>('/api/templates', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
-    }).then(json<{ published: TemplateDoc }>),
+    }),
 
-  listUsers: () =>
-    fetch('/api/users').then(json<{ count: number, users: Array<{ email: string }> }>),
+  listUsers: () => request<{ count: number, users: Array<{ email: string }> }>('/api/users'),
 
-  push: (body: { triggeredBy: string, dryRun?: boolean }) =>
-    fetch('/api/push', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    }).then(json<{ jobId: string, success: number, failed: number, results: PushResult[] }>),
+  push: (body: { dryRun?: boolean }) =>
+    request<{ jobId: string, success: number, failed: number, results: PushResult[] }>(
+      '/api/push',
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  audit: () =>
-    fetch('/api/audit').then(json<{ currentVersion: number | null, users: AuditUser[] }>),
+  audit: () => request<{ currentVersion: number | null, users: AuditUser[] }>('/api/audit'),
 }

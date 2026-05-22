@@ -1,5 +1,6 @@
 import cors from '@fastify/cors'
 import Fastify from 'fastify'
+import { adminRoutes } from './routes/admins.js'
 import { auditRoutes } from './routes/audit.js'
 import { pushRoutes } from './routes/push.js'
 import { templatesRoutes } from './routes/templates.js'
@@ -11,6 +12,7 @@ await app.register(cors, { origin: true })
 
 app.get('/health', async () => ({ status: 'ok' }))
 
+await app.register(adminRoutes)
 await app.register(usersRoutes)
 await app.register(templatesRoutes)
 await app.register(pushRoutes)

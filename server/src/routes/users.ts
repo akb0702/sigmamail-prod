@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify'
+import { requireAdmin } from '../lib/auth.js'
 import { directoryAs } from '../lib/google.js'
 
 const ADMIN = process.env.ADMIN_EMAIL ?? 'akbar@aadrila.com'
 const DOMAIN = process.env.DOMAIN ?? 'aadrila.com'
 
 export async function usersRoutes(app: FastifyInstance) {
-  app.get('/api/users', async () => {
+  app.get('/api/users', { preHandler: requireAdmin }, async () => {
     const dir = directoryAs(ADMIN)
     const { data } = await dir.users.list({ domain: DOMAIN, maxResults: 500 })
     const users = (data.users ?? []).map((u) => ({

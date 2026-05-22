@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import pLimit from 'p-limit'
+import { requireAdmin } from '../lib/auth.js'
 import { pushJobs, templates, users as usersCol } from '../lib/firestore.js'
 import { directoryAs, gmailFor } from '../lib/google.js'
 import { renderSignature } from '../lib/render.js'
@@ -16,7 +17,6 @@ interface TemplateDoc extends TemplateConfig {
 
 interface PushBody {
   dryRun?: boolean
-  triggeredBy: string
 }
 
 interface PushResult {
@@ -26,8 +26,9 @@ interface PushResult {
 }
 
 export async function pushRoutes(app: FastifyInstance) {
-  app.post<{ Body: PushBody }>('/api/push', async (req) => {
-    const { dryRun = false, triggeredBy } = req.body
+  app.post<{ Body: PushBody }>('/api/push', { preHandler: requireAdmin }, async (req) => {
+    const { dryRun = false } = req.body
+    const triggeredBy = req.admin!.email
 
     const currentSnap = await templates.doc('current').get()
     if (!currentSnap.exists) {
