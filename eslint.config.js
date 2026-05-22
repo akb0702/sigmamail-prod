@@ -4,7 +4,7 @@ export default antfu({
   formatters: {
     css: true,
   },
-  ignores: ['**/generated/'],
+  ignores: ['**/generated/', 'server/**'],
   rules: {
     'eslint-comments/no-unlimited-disable': 'off',
     'perfectionist/sort-imports': [
