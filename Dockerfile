@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.6
+
+# ---- 1. Build the Vue frontend ----
+FROM oven/bun:1.1.30 AS web
+WORKDIR /app
+COPY package.json bun.lock ./
+COPY tsconfig*.json vite.config.ts components.json index.html ./
+COPY public ./public
+COPY src ./src
+RUN bun install --frozen-lockfile
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+RUN bun run build
+
+# ---- 2. Build the Node API ----
+FROM node:22-bookworm-slim AS api
+WORKDIR /app
+COPY server/package.json server/package-lock.json ./
+RUN npm ci --omit=dev
+COPY server/tsconfig.json ./
+COPY server/src ./src
+
+# ---- 3. Final runtime ----
+FROM node:22-bookworm-slim
+ENV NODE_ENV=production
+ENV PORT=8080
+ENV STATIC_DIR=/app/public
+WORKDIR /app
+
+# tsx is needed because we run TypeScript directly (no compile step).
+# Pin it as a runtime dep here so we don't pull in all devDependencies.
+RUN npm install -g tsx@4.19.2
+
+COPY --from=api  /app/node_modules ./node_modules
+COPY --from=api  /app/src          ./src
+COPY --from=api  /app/package.json ./package.json
+COPY --from=web  /app/dist         ./public
+
+EXPOSE 8080
+CMD ["tsx", "src/index.ts"]

@@ -2,7 +2,7 @@ import { google } from 'googleapis'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const KEY_PATH = resolve(process.cwd(), 'sa-key.json')
+const KEY_PATH = process.env.SA_KEY_PATH ?? resolve(process.cwd(), 'sa-key.json')
 
 function loadKey() {
   const raw = readFileSync(KEY_PATH, 'utf8')
