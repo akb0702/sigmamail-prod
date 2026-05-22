@@ -37,6 +37,15 @@ const routes = [
     },
   },
   {
+    path: '/publish',
+    component: () => import('@/views/Publish.vue'),
+    meta: {
+      title: 'Publish & push to domain',
+      description:
+        'Save a version of the brand signature and push it to every aadrila.com mailbox.',
+    },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/basic',
   },
