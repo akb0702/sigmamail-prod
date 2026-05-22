@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6
 
 # ---- 1. Build the Vue frontend ----
-FROM oven/bun:1.1.30 AS web
+FROM oven/bun:1.2-slim AS web
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY tsconfig*.json vite.config.ts components.json index.html ./
