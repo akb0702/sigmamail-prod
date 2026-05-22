@@ -1,14 +1,20 @@
 {
   "name": "aadrila-signature-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "push:test": "tsx src/push-test.ts",
-    "list:users": "tsx src/list-users.ts"
+    "dev": "tsx watch src/index.ts",
+    "start": "node --import tsx src/index.ts",
+    "push:test": "tsx src/scripts/push-test.ts",
+    "list:users": "tsx src/scripts/list-users.ts"
   },
   "dependencies": {
-    "googleapis": "^144.0.0"
+    "@google-cloud/firestore": "^7.10.0",
+    "fastify": "^5.1.0",
+    "@fastify/cors": "^10.0.1",
+    "googleapis": "^144.0.0",
+    "p-limit": "^6.1.0"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

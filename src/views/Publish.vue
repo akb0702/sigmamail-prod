@@ -1,70 +1,123 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import UilCheckCircle from '~icons/uil/check-circle'
 import UilExclamationTriangle from '~icons/uil/exclamation-triangle'
 import UilRocket from '~icons/uil/rocket'
 import UilSave from '~icons/uil/save'
 
+import type { AuditUser, TemplateDoc } from '@/lib/api'
+
+import { api } from '@/lib/api'
+
 const { installed } = useSignatures()
 
-interface PublishedVersion {
-  version: number
-  templateName: string
-  publishedAt: string
-  publishedBy: string
-}
+const ADMIN_EMAIL = 'akbar@aadrila.com'
 
-const STORAGE_KEY = 'aadrila-published-version'
+const published = ref<TemplateDoc | null>(null)
+const userCount = ref<number | null>(null)
+const auditRows = ref<AuditUser[]>([])
+const currentAuditVersion = ref<number | null>(null)
 
-function loadPublished(): PublishedVersion | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : null
-  }
-  catch {
-    return null
-  }
-}
-
-const published = ref<PublishedVersion | null>(loadPublished())
 const isPushing = ref(false)
+const isPublishing = ref(false)
 const lastPushResult = ref<{ success: number, failed: number } | null>(null)
+const apiError = ref<string | null>(null)
 
 const nextVersion = computed(() => (published.value?.version ?? 0) + 1)
 const hasUnpublishedChanges = computed(
   () => !published.value || published.value.templateName !== installed.name,
 )
+const driftCount = computed(() => auditRows.value.filter(r => r.drift).length)
 
-function publish() {
-  const v: PublishedVersion = {
-    version: nextVersion.value,
+function buildConfig() {
+  const opts = installed.tools.options
+  return {
     templateName: installed.name,
-    publishedAt: new Date().toISOString(),
-    publishedBy: 'akbar@aadrila.com',
+    mainColor: opts.mainColor,
+    fontFamily: opts.fontFamily,
+    fields: {
+      showTitle: true,
+      showPhone: true,
+      showPhoto: !!opts.avatar,
+    },
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(v))
-  published.value = v
 }
 
-async function pushToAll() {
+async function refreshState() {
+  apiError.value = null
+  try {
+    const [cur, users, audit] = await Promise.all([
+      api.getCurrentTemplate(),
+      api.listUsers().catch(() => ({ count: null as number | null, users: [] })),
+      api.audit().catch(() => ({ currentVersion: null, users: [] as AuditUser[] })),
+    ])
+    published.value = cur.current
+    userCount.value = users.count
+    auditRows.value = audit.users
+    currentAuditVersion.value = audit.currentVersion
+  }
+  catch (e: any) {
+    apiError.value = `Backend unavailable: ${e?.message ?? e}. Is server/ running on :8080?`
+  }
+}
+
+async function publish() {
+  isPublishing.value = true
+  apiError.value = null
+  try {
+    const { published: doc } = await api.publishTemplate({
+      ...buildConfig(),
+      publishedBy: ADMIN_EMAIL,
+    })
+    published.value = doc
+  }
+  catch (e: any) {
+    apiError.value = `Publish failed: ${e?.message ?? e}`
+  }
+  finally {
+    isPublishing.value = false
+  }
+}
+
+async function pushToAll(dryRun: boolean) {
   if (!published.value)
     return
   isPushing.value = true
   lastPushResult.value = null
-  // TODO Phase 2b: POST /api/push  → server calls Gmail API for each user
-  await new Promise(r => setTimeout(r, 1500))
-  isPushing.value = false
-  lastPushResult.value = { success: 23, failed: 0 }
+  apiError.value = null
+  try {
+    const res = await api.push({ triggeredBy: ADMIN_EMAIL, dryRun })
+    lastPushResult.value = { success: res.success, failed: res.failed }
+    await refreshState()
+  }
+  catch (e: any) {
+    apiError.value = `Push failed: ${e?.message ?? e}`
+  }
+  finally {
+    isPushing.value = false
+  }
 }
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString()
 }
+
+onMounted(refreshState)
 </script>
 
 <template>
   <LayoutsDefault>
     <div class="flex flex-col gap-6">
+      <UiAlert
+        v-if="apiError"
+        variant="destructive"
+      >
+        <UilExclamationTriangle class="w-4 h-4" />
+        <div class="ml-2 text-sm">
+          {{ apiError }}
+        </div>
+      </UiAlert>
+
       <UiAlert>
         <UilRocket class="w-4 h-4" />
         <div class="ml-2">
@@ -98,7 +151,8 @@ function formatDate(iso: string) {
             <span v-if="published">
               v{{ published.version }} ({{ published.templateName }})
               <span class="text-muted-foreground">
-                by {{ published.publishedBy }} · {{ formatDate(published.publishedAt) }}</span>
+                by {{ published.publishedBy }} · {{ formatDate(published.publishedAt) }}
+              </span>
             </span>
             <span
               v-else
@@ -125,10 +179,11 @@ function formatDate(iso: string) {
         </dl>
         <div class="mt-5 flex gap-2">
           <UiButton
-            :disabled="!hasUnpublishedChanges"
+            :disabled="!hasUnpublishedChanges || isPublishing"
             @click="publish"
           >
-            Publish as v{{ nextVersion }}
+            <span v-if="isPublishing">Publishing…</span>
+            <span v-else>Publish as v{{ nextVersion }}</span>
           </UiButton>
         </div>
       </section>
@@ -140,17 +195,25 @@ function formatDate(iso: string) {
         <p class="text-sm text-muted-foreground mb-4">
           Sends the published signature to every user in
           <code class="px-1 py-0.5 bg-muted rounded text-xs">aadrila.com</code> via the Gmail API.
-          Each user's signature is rendered with their own Workspace Directory data (name, title,
-          phone). Users do not need to do anything.
+          Each user's signature is rendered with their own Workspace Directory data.
         </p>
         <div class="flex items-center gap-3">
           <UiButton
             variant="default"
             :disabled="!published || isPushing"
-            @click="pushToAll"
+            @click="pushToAll(false)"
           >
             <span v-if="isPushing">Pushing…</span>
-            <span v-else>Push to all 23 users</span>
+            <span v-else>
+              Push to all<span v-if="userCount !== null"> {{ userCount }}</span> users
+            </span>
+          </UiButton>
+          <UiButton
+            variant="outline"
+            :disabled="!published || isPushing"
+            @click="pushToAll(true)"
+          >
+            Dry run
           </UiButton>
           <span
             v-if="!published"
@@ -176,24 +239,94 @@ function formatDate(iso: string) {
           >
             ❌ {{ lastPushResult.failed }} failed
           </div>
-          <p class="mt-2 text-xs text-muted-foreground">
-            (Stubbed — real Gmail API push wires up in Phase 2b.)
-          </p>
         </div>
       </section>
 
       <section class="border rounded-md p-5">
-        <h2 class="text-base font-semibold mb-3">
-          Audit (preview)
-        </h2>
-        <p class="text-sm text-muted-foreground">
-          Phase 2b will list every
-          <code class="px-1 py-0.5 bg-muted rounded text-xs">@aadrila.com</code> user with the
-          template version currently on their Gmail account, flagging anyone drifted from the
-          published version. Backed by Firestore
-          <code class="px-1 py-0.5 bg-muted rounded text-xs">users/</code> and
-          <code class="px-1 py-0.5 bg-muted rounded text-xs">pushJobs/</code> collections.
-        </p>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-semibold">
+            Audit
+          </h2>
+          <span class="text-xs text-muted-foreground">
+            Current v{{ currentAuditVersion ?? '—' }} ·
+            <span
+              v-if="driftCount"
+              class="text-amber-600 dark:text-amber-400"
+            >
+              {{ driftCount }} drifted
+            </span>
+            <span
+              v-else
+              class="text-emerald-600 dark:text-emerald-400"
+            > All in sync </span>
+          </span>
+        </div>
+        <div
+          v-if="!auditRows.length"
+          class="text-sm text-muted-foreground italic"
+        >
+          No push history yet. Push the published template to populate the audit log.
+        </div>
+        <table
+          v-else
+          class="w-full text-sm"
+        >
+          <thead class="text-xs text-muted-foreground border-b">
+            <tr>
+              <th class="text-left py-2">
+                User
+              </th>
+              <th class="text-left py-2">
+                Version
+              </th>
+              <th class="text-left py-2">
+                Last applied
+              </th>
+              <th class="text-left py-2">
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="row in auditRows"
+              :key="row.email"
+              class="border-b last:border-b-0"
+            >
+              <td class="py-2 font-mono text-xs">
+                {{ row.email }}
+              </td>
+              <td class="py-2">
+                <span v-if="row.appliedVersion !== null">v{{ row.appliedVersion }}</span>
+                <span
+                  v-else
+                  class="text-muted-foreground"
+                >—</span>
+              </td>
+              <td class="py-2 text-muted-foreground">
+                {{ row.appliedAt ? formatDate(row.appliedAt) : '—' }}
+              </td>
+              <td class="py-2">
+                <span
+                  v-if="row.lastError"
+                  class="text-red-600 dark:text-red-400"
+                >
+                  {{ row.lastError }}
+                </span>
+                <span
+                  v-else-if="row.drift"
+                  class="text-amber-600 dark:text-amber-400"
+                >
+                  Drifted
+                </span>
+                <span
+                  v-else
+                  class="text-emerald-600 dark:text-emerald-400"
+                > In sync </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </section>
     </div>
   </LayoutsDefault>
