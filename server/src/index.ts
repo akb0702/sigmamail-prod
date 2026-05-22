@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 import { adminRoutes } from './routes/admins.js'
 import { auditRoutes } from './routes/audit.js'
 import { pushRoutes } from './routes/push.js'
+import { renderRoutes } from './routes/render.js'
 import { templatesRoutes } from './routes/templates.js'
 import { usersRoutes } from './routes/users.js'
 
@@ -19,6 +20,7 @@ await app.register(adminRoutes)
 await app.register(usersRoutes)
 await app.register(templatesRoutes)
 await app.register(pushRoutes)
+await app.register(renderRoutes)
 await app.register(auditRoutes)
 
 // Serve the built SPA from /app/dist in production. Skipped in local dev,

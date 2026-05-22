@@ -1,7 +1,12 @@
 import { getAuthHeaders, signOut } from './auth'
 
+export interface SocialLink {
+  platform: 'linkedin' | 'twitter' | 'instagram' | 'facebook' | 'youtube' | 'website'
+  url: string
+}
+
 export interface TemplateConfig {
-  templateName: string
+  templateName?: string
   mainColor: string
   fontFamily: string
   fields: {
@@ -9,6 +14,17 @@ export interface TemplateConfig {
     showPhone: boolean
     showPhoto: boolean
   }
+  companyName?: string
+  website?: string
+  tagline?: string
+  logoUrl?: string
+  secondaryColor?: string
+  fontSize?: number
+  avatarShape?: 'square' | 'round'
+  avatarSize?: number
+  socials?: SocialLink[]
+  disclaimer?: string
+  cta?: { text: string, url: string } | null
 }
 
 export interface TemplateDoc extends TemplateConfig {
@@ -79,4 +95,10 @@ export const api = {
     ),
 
   audit: () => request<{ currentVersion: number | null, users: AuditUser[] }>('/api/audit'),
+
+  previewRender: (config: TemplateConfig, userEmail?: string) =>
+    request<{ html: string, user: { email: string, fullName: string } }>('/api/render/preview', {
+      method: 'POST',
+      body: JSON.stringify({ config, userEmail }),
+    }),
 }
