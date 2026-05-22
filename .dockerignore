@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.github
+.vscode
+auto-imports.d.ts
+components.d.ts
+server/sa-key.json
+server/*.log
+*.log
