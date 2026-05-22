@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { requireAdmin } from '../lib/auth.js'
 import { templates } from '../lib/firestore.js'
 import type { TemplateConfig } from '../lib/render.js'
 
@@ -20,26 +21,30 @@ export async function templatesRoutes(app: FastifyInstance) {
     return { versions: snap.docs.map((d) => d.data() as TemplateDoc) }
   })
 
-  app.post<{ Body: TemplateConfig & { publishedBy: string } }>('/api/templates', async (req) => {
-    const body = req.body
-    const currentSnap = await templates.doc('current').get()
-    const nextVersion = currentSnap.exists ? (currentSnap.data() as TemplateDoc).version + 1 : 1
+  app.post<{ Body: TemplateConfig }>(
+    '/api/templates',
+    { preHandler: requireAdmin },
+    async (req) => {
+      const body = req.body
+      const currentSnap = await templates.doc('current').get()
+      const nextVersion = currentSnap.exists ? (currentSnap.data() as TemplateDoc).version + 1 : 1
 
-    const doc: TemplateDoc = {
-      version: nextVersion,
-      templateName: body.templateName,
-      mainColor: body.mainColor,
-      fontFamily: body.fontFamily,
-      fields: body.fields,
-      publishedAt: new Date().toISOString(),
-      publishedBy: body.publishedBy,
-    }
+      const doc: TemplateDoc = {
+        version: nextVersion,
+        templateName: body.templateName,
+        mainColor: body.mainColor,
+        fontFamily: body.fontFamily,
+        fields: body.fields,
+        publishedAt: new Date().toISOString(),
+        publishedBy: req.admin!.email,
+      }
 
-    const batch = templates.firestore.batch()
-    batch.set(templates.doc(`v${nextVersion}`), doc)
-    batch.set(templates.doc('current'), doc)
-    await batch.commit()
+      const batch = templates.firestore.batch()
+      batch.set(templates.doc(`v${nextVersion}`), doc)
+      batch.set(templates.doc('current'), doc)
+      await batch.commit()
 
-    return { published: doc }
-  })
+      return { published: doc }
+    },
+  )
 }

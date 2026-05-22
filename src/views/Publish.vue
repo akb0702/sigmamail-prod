@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import UilCheckCircle from '~icons/uil/check-circle'
 import UilExclamationTriangle from '~icons/uil/exclamation-triangle'
 import UilRocket from '~icons/uil/rocket'
@@ -8,11 +8,11 @@ import UilSave from '~icons/uil/save'
 import type { AuditUser, TemplateDoc } from '@/lib/api'
 
 import { api } from '@/lib/api'
+import { admin, authError, renderSignInButton, signOut } from '@/lib/auth'
 
 const { installed } = useSignatures()
 
-const ADMIN_EMAIL = 'akbar@aadrila.com'
-
+const signInEl = ref<HTMLDivElement | null>(null)
 const published = ref<TemplateDoc | null>(null)
 const userCount = ref<number | null>(null)
 const auditRows = ref<AuditUser[]>([])
@@ -44,6 +44,8 @@ function buildConfig() {
 }
 
 async function refreshState() {
+  if (!admin.value)
+    return
   apiError.value = null
   try {
     const [cur, users, audit] = await Promise.all([
@@ -65,10 +67,7 @@ async function publish() {
   isPublishing.value = true
   apiError.value = null
   try {
-    const { published: doc } = await api.publishTemplate({
-      ...buildConfig(),
-      publishedBy: ADMIN_EMAIL,
-    })
+    const { published: doc } = await api.publishTemplate(buildConfig())
     published.value = doc
   }
   catch (e: any) {
@@ -86,7 +85,7 @@ async function pushToAll(dryRun: boolean) {
   lastPushResult.value = null
   apiError.value = null
   try {
-    const res = await api.push({ triggeredBy: ADMIN_EMAIL, dryRun })
+    const res = await api.push({ dryRun })
     lastPushResult.value = { success: res.success, failed: res.failed }
     await refreshState()
   }
@@ -102,12 +101,65 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString()
 }
 
-onMounted(refreshState)
+onMounted(async () => {
+  if (signInEl.value && !admin.value) {
+    await renderSignInButton(signInEl.value)
+  }
+  await refreshState()
+})
+
+watch(admin, async (val) => {
+  if (val) {
+    await refreshState()
+  }
+  else if (signInEl.value) {
+    await renderSignInButton(signInEl.value)
+  }
+})
 </script>
 
 <template>
   <LayoutsDefault>
-    <div class="flex flex-col gap-6">
+    <div
+      v-if="!admin"
+      class="flex flex-col items-center justify-center py-16 gap-4"
+    >
+      <h2 class="text-xl font-semibold">
+        Admin sign-in required
+      </h2>
+      <p class="text-sm text-muted-foreground max-w-md text-center">
+        Sign in with your
+        <code class="px-1 py-0.5 bg-muted rounded text-xs">@aadrila.com</code> Google account. Only
+        emails listed in the Firestore
+        <code class="px-1 py-0.5 bg-muted rounded text-xs">admins/</code> collection can publish and
+        push signatures.
+      </p>
+      <div ref="signInEl" />
+      <p
+        v-if="authError"
+        class="text-sm text-red-600 dark:text-red-400"
+      >
+        {{ authError }}
+      </p>
+    </div>
+
+    <div
+      v-else
+      class="flex flex-col gap-6"
+    >
+      <div class="flex items-center justify-between text-sm text-muted-foreground">
+        <span>
+          Signed in as <strong class="text-foreground">{{ admin.email }}</strong>
+        </span>
+        <UiButton
+          variant="ghost"
+          size="sm"
+          @click="signOut"
+        >
+          Sign out
+        </UiButton>
+      </div>
+
       <UiAlert
         v-if="apiError"
         variant="destructive"

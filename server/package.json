@@ -7,12 +7,14 @@
     "dev": "tsx watch src/index.ts",
     "start": "node --import tsx src/index.ts",
     "push:test": "tsx src/scripts/push-test.ts",
-    "list:users": "tsx src/scripts/list-users.ts"
+    "list:users": "tsx src/scripts/list-users.ts",
+    "seed:admin": "tsx src/scripts/seed-admin.ts"
   },
   "dependencies": {
     "@google-cloud/firestore": "^7.10.0",
     "fastify": "^5.1.0",
     "@fastify/cors": "^10.0.1",
+    "google-auth-library": "^9.15.0",
     "googleapis": "^144.0.0",
     "p-limit": "^6.1.0"
   },
