@@ -5,14 +5,25 @@ import UilExclamationTriangle from '~icons/uil/exclamation-triangle'
 import UilRocket from '~icons/uil/rocket'
 import UilSave from '~icons/uil/save'
 
-import type { AuditUser, TemplateDoc } from '@/lib/api'
+import type { AuditUser, SocialLink, TemplateConfig, TemplateDoc } from '@/lib/api'
 
 import { api } from '@/lib/api'
 import { admin, authError, renderSignInButton, signOut } from '@/lib/auth'
 
-const { installed } = useSignatures()
+const { installed, socials: signatureSocials } = useSignatures()
+
+const BACKEND_SOCIAL_PLATFORMS: SocialLink['platform'][] = [
+  'linkedin',
+  'twitter',
+  'instagram',
+  'facebook',
+  'youtube',
+  'website',
+]
 
 const signInEl = ref<HTMLDivElement | null>(null)
+const previewHtml = ref<string>('')
+const previewError = ref<string | null>(null)
 const published = ref<TemplateDoc | null>(null)
 const userCount = ref<number | null>(null)
 const auditRows = ref<AuditUser[]>([])
@@ -29,17 +40,48 @@ const hasUnpublishedChanges = computed(
 )
 const driftCount = computed(() => auditRows.value.filter(r => r.drift).length)
 
-function buildConfig() {
+function buildConfig(): TemplateConfig {
   const opts = installed.tools.options
+  const addons = installed.tools.addons ?? []
+
+  const socials: SocialLink[] = (signatureSocials.value ?? [])
+    .filter((s: any) => s.value && BACKEND_SOCIAL_PLATFORMS.includes(s.icon))
+    .map((s: any) => ({ platform: s.icon, url: s.value }))
+
+  const disclaimerAddon = addons.find((a: any) => a.type === 'disclaimer' && a.value)
+  const ctaAddon = addons.find((a: any) => a.type === 'cta' && a.value?.text && a.value?.link)
+
   return {
     templateName: installed.name,
     mainColor: opts.mainColor,
+    secondaryColor: opts.secondaryColor ?? '#555555',
     fontFamily: opts.fontFamily,
+    fontSize: opts.fontSize ?? 13,
+    avatarShape: opts.avatarShape === 'round' ? 'round' : 'square',
+    avatarSize: opts.avatarSize ?? 72,
+    companyName: 'Aadrila',
+    website: 'aadrila.com',
     fields: {
       showTitle: true,
       showPhone: true,
       showPhoto: !!opts.avatar,
     },
+    socials,
+    disclaimer: typeof disclaimerAddon?.value === 'string' ? disclaimerAddon.value : undefined,
+    cta: ctaAddon ? { text: ctaAddon.value.text, url: ctaAddon.value.link } : null,
+  }
+}
+
+async function refreshPreview() {
+  if (!admin.value)
+    return
+  previewError.value = null
+  try {
+    const { html } = await api.previewRender(buildConfig(), admin.value.email)
+    previewHtml.value = html
+  }
+  catch (e: any) {
+    previewError.value = `Preview failed: ${e?.message ?? e}`
   }
 }
 
@@ -57,6 +99,7 @@ async function refreshState() {
     userCount.value = users.count
     auditRows.value = audit.users
     currentAuditVersion.value = audit.currentVersion
+    await refreshPreview()
   }
   catch (e: any) {
     apiError.value = `Backend unavailable: ${e?.message ?? e}. Is server/ running on :8080?`
@@ -184,6 +227,38 @@ watch(admin, async (val) => {
           </p>
         </div>
       </UiAlert>
+
+      <section class="border rounded-md p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-semibold">
+            Email preview
+          </h2>
+          <UiButton
+            variant="ghost"
+            size="sm"
+            @click="refreshPreview"
+          >
+            Refresh
+          </UiButton>
+        </div>
+        <p class="text-xs text-muted-foreground mb-3">
+          What this signature will look like in Gmail for
+          <code class="px-1 py-0.5 bg-muted rounded">{{ admin?.email }}</code> — rendered
+          server-side with juice CSS inlining (Outlook-safe).
+        </p>
+        <div
+          v-if="previewError"
+          class="text-sm text-red-600 dark:text-red-400 mb-3"
+        >
+          {{ previewError }}
+        </div>
+        <iframe
+          :srcdoc="previewHtml"
+          class="w-full bg-white rounded border"
+          style="height: 280px"
+          sandbox="allow-same-origin"
+        />
+      </section>
 
       <section class="border rounded-md p-5">
         <h2 class="text-base font-semibold mb-3 flex items-center gap-2">

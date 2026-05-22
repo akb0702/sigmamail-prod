@@ -30,11 +30,8 @@ export async function templatesRoutes(app: FastifyInstance) {
       const nextVersion = currentSnap.exists ? (currentSnap.data() as TemplateDoc).version + 1 : 1
 
       const doc: TemplateDoc = {
+        ...body,
         version: nextVersion,
-        templateName: body.templateName,
-        mainColor: body.mainColor,
-        fontFamily: body.fontFamily,
-        fields: body.fields,
         publishedAt: new Date().toISOString(),
         publishedBy: req.admin!.email,
       }
