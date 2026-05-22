@@ -20,7 +20,7 @@ set -euo pipefail
 PROJECT_ID="${PROJECT_ID:-aadrila-sigmasign}"
 REGION="${REGION:-asia-south1}"
 SERVICE_NAME="${SERVICE_NAME:-signatures}"
-SA_EMAIL="signature-pusher@${PROJECT_ID}.iam.gserviceaccount.com"
+SA_EMAIL="${SA_EMAIL:-signature-pusher@${PROJECT_ID}.iam.gserviceaccount.com}"
 IMAGE="gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest"
 ADMIN_EMAIL="${ADMIN_EMAIL:-akbar@aadrila.com}"
 DOMAIN="${DOMAIN:-aadrila.com}"
@@ -35,7 +35,9 @@ for arg in "$@"; do
   case "$arg" in
     --region=*)        REGION="${arg#*=}" ;;
     --client-id=*)     CLIENT_ID="${arg#*=}" ;;
-    --project=*)       PROJECT_ID="${arg#*=}" ;;
+    --project=*)       PROJECT_ID="${arg#*=}"
+                       SA_EMAIL="${SA_EMAIL:-signature-pusher@${PROJECT_ID}.iam.gserviceaccount.com}" ;;
+    --sa-email=*)      SA_EMAIL="${arg#*=}" ;;
     --skip-secret)     SKIP_SECRET=1 ;;
     --skip-build)      SKIP_BUILD=1 ;;
     -h|--help)
