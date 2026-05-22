@@ -1,4 +1,4 @@
-import { gmailFor } from './lib/google.js'
+import { gmailFor } from '../lib/google.js'
 
 const TARGET = process.env.TARGET_EMAIL ?? 'akbar@aadrila.com'
 

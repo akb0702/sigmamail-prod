@@ -1,4 +1,4 @@
-import { directoryAs } from './lib/google.js'
+import { directoryAs } from '../lib/google.js'
 
 const ADMIN = process.env.ADMIN_EMAIL ?? 'akbar@aadrila.com'
 const DOMAIN = process.env.DOMAIN ?? 'aadrila.com'
