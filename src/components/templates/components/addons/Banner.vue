@@ -15,7 +15,7 @@ defineProps<Props>()
 
 const { getAddonValue } = useSignatures()
 
-const DEFAULT_BANNER_IMAGE = `/assets/mysigmail-promo-banner.png`
+const DEFAULT_BANNER_IMAGE = ''
 
 const banner = computed(() => getAddonValue<AddonBanner>('banner'))
 </script>

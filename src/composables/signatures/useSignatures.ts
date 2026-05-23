@@ -166,7 +166,7 @@ function downloadJSON(signature: Signature) {
 
   const a = document.createElement('a')
   a.href = url
-  a.download = 'mysigmail-signature.json'
+  a.download = 'aadrila-signature.json'
   a.click()
   URL.revokeObjectURL(url)
 }
